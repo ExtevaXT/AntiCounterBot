@@ -32,65 +32,82 @@ class Program
 
     static int step = 1;
     static int threshold = 4;
-    static int keepPrice = 1;
+    static int keepPrice = 1; // not working
+    static int min_price;
+    static int default_price;
 
     static string key;
     static string api;
     static async Task Main(string[] args)
     {
-        Config();
-        string path = Path.Combine(Environment.CurrentDirectory, "inventory.txt");
-        Console.WriteLine("AntiCounterBot V2");
-        Console.WriteLine("Fetching market inventory...");
-        string myInventory = $"{api}/my-inventory/?key={key}";
+        try
+        {
+            Config();
+            string path = Path.Combine(Environment.CurrentDirectory, "inventory.txt");
+            Console.WriteLine("AntiCounterBot V2");
+            Console.WriteLine("Fetching market inventory...");
+            string myInventory = $"{api}/my-inventory/?key={key}";
 
-        HttpClient client = new HttpClient();
-        var json = await Request(client, myInventory);
-        if(json == null)
-        {
-            Console.WriteLine("Market is dead, restart");
-            return;
-        }
-        var inventory = JsonConvert.DeserializeObject<Inventory>(json);
-        if (inventory != null)
-        {
-            using (StreamWriter writer = new StreamWriter(path))
+            HttpClient client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(600);
+            var json = await Request(client, myInventory);
+            if (json == null)
             {
-                foreach (var item in inventory.items)
+                Console.WriteLine("Market is dead, restart");
+                return;
+            }
+            var inventory = JsonConvert.DeserializeObject<Inventory>(json);
+            if (inventory != null)
+            {
+                using (StreamWriter writer = new StreamWriter(path))
                 {
-                    string itemText = $"{item.id}: {item.market_hash_name}";
-                    writer.WriteLine(itemText);
+                    foreach (var item in inventory.items)
+                    {
+                        string itemText = $"{item.id}: {item.market_hash_name}";
+                        writer.WriteLine(itemText);
+                    }
+                }
+                Console.WriteLine($"Inventory written to {path}");
+                string steamItemId = "";
+                // TODO remove validId shit from gpt
+                bool validId = false;
+                Console.WriteLine("Enter steam item id:");
+                do
+                {
+                    steamItemId = Console.ReadLine();
+                    var item = inventory.items.Find(item => item.id == steamItemId);
+                    if (item != null)
+                    {
+                        validId = true;
+                        itemName = item.market_hash_name;
+                    }
+                    else Console.WriteLine("Invalid id, try again");
+                }
+                while (!validId);
+                Console.WriteLine(Log("Selected: " + itemName));
+                Console.WriteLine("Default price, null to lowest:");
+                default_price = Convert.ToInt32(Console.ReadLine());
+                Console.WriteLine("Min price to harass:");
+                min_price = Convert.ToInt32(Console.ReadLine());
+                if(default_price < 1000 && min_price < 1000)
+                Console.WriteLine("Are you sure?");
+                Console.ReadLine();
+                while (true) // Run indefinitely
+                {
+                    await ProcessItem(api, key, client, steamItemId, itemName);
+                    await Task.Delay(delay); // Wait for 60 seconds before the next iteration
                 }
             }
-            Console.WriteLine($"Inventory written to {path}");
-            string steamItemId = "";
-            // TODO remove validId shit from gpt
-            bool validId = false;
-            Console.WriteLine("Enter steam item id:");
-            do
-            {
-                steamItemId = Console.ReadLine();
-                var item = inventory.items.Find(item => item.id == steamItemId);
-                if (item != null)
-                {
-                    validId = true;
-                    itemName = item.market_hash_name;
-                }  
-                else Console.WriteLine("Invalid id, try again");
-            } 
-            while (!validId);
-            Console.WriteLine(Log("Selected: " + itemName));
-            Console.WriteLine("Min price to harass:");
-            int min_price = Convert.ToInt32(Console.ReadLine());
-
-            while (true) // Run indefinitely
-            {
-                await ProcessItem(api, key, client, steamItemId, itemName, min_price);
-                await Task.Delay(delay); // Wait for 60 seconds before the next iteration
-            }
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine(Log(ex.StackTrace));
+            Console.WriteLine(Log(ex.Message));
+            Console.ReadLine();
+        }
+        
     }
-    static async Task ProcessItem(string api, string key, HttpClient client, string steamItemId, string itemName, int min_price)
+    static async Task ProcessItem(string api, string key, HttpClient client, string steamItemId, string itemName)
     {
         string d = $"[{DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss")}]";
         string? json = null;
@@ -131,6 +148,7 @@ class Program
         if (marketItem == null)
         {
             if (keepPrice < 0) price = keepPrice;
+            if(default_price != 0) price = default_price;
             string addToSale = $"{api}/add-to-sale?key={key}&id={steamItemId}&price={price}&cur=RUB";
             json = await Request(client, addToSale);
             if (json == null)
@@ -142,8 +160,7 @@ class Program
             var sale = JsonConvert.DeserializeObject<AddToSale>(json);
             if (!sale.success)
             {
-                Console.WriteLine(Log($"{d} {sale.error}"));
-                Console.ReadLine();
+                Console.WriteLine(sale.error);
                 return;
             }
             marketItem = sale.item_id;
@@ -192,7 +209,7 @@ class Program
         lowest_price = offers.data.First().price;
         if (lowest_price != price) 
             price = lowest_price - step;
-        if (lowest_price == price)
+        if (lowest_price == price && offers.data.Count>=2)
             price = offers.data[1].price - step;
     }
     static async Task<string?> Request(HttpClient client, string api)
