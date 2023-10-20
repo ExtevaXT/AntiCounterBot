@@ -1,6 +1,10 @@
 # AntiCounterBot
 
-It is same as counterbot but free and should go ahead of it on page (At least will harass it)
+Offender of official CounterBot (bots that interrupt offers for a 0.01) ~~and market~~
+
+It is same but free and should go ahead of it on page
+
+For auto trades check out https://github.com/soyware/OpenMarketClient
 
 <hr>
 
@@ -19,14 +23,29 @@ It is same as counterbot but free and should go ahead of it on page (At least wi
 - Logging in `log.txt`
 <hr>
 
-## IMPORTANT
-1. If counterbot user placed 2 bots in different time they may prevent your advantage but you still will harass them
-2. Multiprocess maybe will work
+![screenshot](screenshot.png)
+
+## Important
+1. If counterbot one user placed several bots they may prevent your advantage. It will spam re-adding
+2. Multiprocess is working
 3. Price API format: 100.00 is 10000
 
 ##  Guide:
-1. Use `config.txt` to specify market api key. Also you can specify threshold to re-add item, step of lowering price, and API url (I tested it only with tf2.tm)
+1. Use `config.txt` to specify:
+```csharp
+    int step = 1;
+    int threshold = 4; // {short_delay} times before re-adding
+    int keep_price = 1; // not working
+    int step_incrementing = 1; // not working
+
+    int cooldown_delay = 60000;
+    int default_delay = 15000;
+    int short_delay = 5000;
+
+    string key;
+    string api; // Tested only tf2.tm
+```
 2. Follow instructions in console
-3. Restart if error before main loop
-4. If error after main loop you can ignore it
+3. Each `too_often` error - {short_delay} gap between lowest and yours
+4. `BadGateway` or `InternalServerError` errors when market denies request or lagging
 
