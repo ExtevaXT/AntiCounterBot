@@ -38,6 +38,7 @@ For auto trades check out https://github.com/soyware/OpenMarketClient
     int keep_price = 1; // not working
     int step_incrementing = 1; // not working
 
+    int single_target = 0; // 1 if you want to use in one exact offer instance
     int cooldown_delay = 60000;
     int default_delay = 15000;
     int short_delay = 5000;

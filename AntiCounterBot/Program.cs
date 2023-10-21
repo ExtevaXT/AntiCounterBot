@@ -1,7 +1,9 @@
 ﻿using Newtonsoft.Json;
+using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using static AntiCounterBot.Request;
+using static AntiCounterBot.Utils;
 // TODO
 // 1. Finishing after buying
 // 2. Batch offers
@@ -28,6 +30,8 @@ class Program
     static int price;
     static int delay = 15000;
     static int outranned = 0;
+    static Inventory? inventory = null;
+    static Item? item = null;
 
     // Runtime Initializing
     static int min_price;
@@ -39,6 +43,7 @@ class Program
     static int keep_price = 1; // not working
     static int step_incrementing = 1;
 
+    static int single_target = 0;
     static int cooldown_delay = 60000;
     static int default_delay = 15000;
     static int short_delay = 5000;
@@ -56,7 +61,6 @@ class Program
 
             HttpClient client = new HttpClient();
             client.Timeout = TimeSpan.FromSeconds(600);
-            Inventory? inventory = null;
             while (inventory == null)
             {
                 string myInventory = $"{api}/my-inventory/?key={key}";
@@ -78,7 +82,7 @@ class Program
             while(itemName == null)
             {
                 steamItemId = Console.ReadLine();
-                var item = inventory.items.Find(item => item.id == steamItemId);
+                item = inventory.items.Find(item => item.id == steamItemId);
                 if (item == null)
                 {
                     Console.WriteLine("Invalid id, try again");
@@ -105,6 +109,7 @@ class Program
         }
         catch (Exception ex)
         {
+            FlashWindow(Process.GetCurrentProcess().MainWindowHandle);
             Console.WriteLine(Log(ex.StackTrace));
             Console.WriteLine(Log(ex.Message));
             Console.ReadLine();
@@ -120,9 +125,17 @@ class Program
 
         if (price <= min_price)
         {
-            Console.WriteLine(Log($"{d} Reached min price, lowest: {lowest_price}"));
-            delay = cooldown_delay;
-            return;
+            if(marketItem == null && default_price != 0)
+            {
+                price = default_price;
+            }
+            else
+            {
+                Console.WriteLine(Log($"{d} Reached min price, lowest: {lowest_price}"));
+                delay = cooldown_delay;
+                return;
+            }
+            
         }
         // If we are first skip
         if(price == lowest_price)
@@ -176,6 +189,12 @@ class Program
         var response = JsonConvert.DeserializeObject<SetPrice>(json);
         if (!response.success)
         {
+            if(response.error == "")
+            {
+                Console.WriteLine($"Finally {itemName} has been bought for {price}");
+                FlashWindow(Process.GetCurrentProcess().MainWindowHandle);
+                Console.Read();
+            }
             Console.WriteLine(response.error);
             // It spams 'too often' if bitch starting to finding gap
             // It is limited to market ~60s cooldown
@@ -184,10 +203,19 @@ class Program
             delay = short_delay;
             return;
         }
-        if (price != lowest_price)
-            Console.WriteLine(Log($"{d} Anticountered {lowest_price} with {price}"));
-        else Console.WriteLine("Item has lowest price");
-        delay = default_delay;
+        if (price == default_price)
+        {
+            Console.WriteLine($"Item has default {price}");
+            delay = default_delay * 2;
+        }
+        else
+        {
+            if (price != lowest_price)
+                Console.WriteLine(Log($"{d} Anticountered {lowest_price} with {price}"));
+            else 
+                Console.WriteLine("Item has lowest price");
+            delay = default_delay;
+        }
         outranned = 0;
     }
     static async Task CheckPrices(HttpClient client)
@@ -198,13 +226,42 @@ class Program
 
         var offers = JsonConvert.DeserializeObject<Offers>(json);
         lowest_price = offers.data.First().price;
-        if (lowest_price != price) 
+        if (single_target == 1)
+        {
+            lowest_price = offers.data.First(offer => offer.instance.ToString() == item.instanceid && offer.@class.ToString() == item.classid).price;
+        }
+
+        if (lowest_price < min_price)
+        {
+            price = default_price;
+        }
+        else if (lowest_price != price)
+        {
             price = lowest_price - step;
-        if (lowest_price == price && offers.data.Count>=2 && offers.data.First().count == 1)
-            if(default_price == 0)
+        }
+        // If items are not stacked
+        if (lowest_price == price && offers.data.Count >= 2 && offers.data.First().count == 1)
+        {
+            if (default_price == 0)
+            {
                 price = offers.data[1].price - step;
+            }
+        }
+
+
+
+
+
+        //if (lowest_price != price) 
+        //    price = lowest_price - step;
+        //if (lowest_price == price && offers.data.Count>=2 && offers.data.First().count == 1)
+        //    if(default_price == 0)
+        //        price = offers.data[1].price - step;
+
+        //if (lowest_price == price && default_price != 0)
+        //    lowest_price = default_price;
             //else price = default_price;
-        // default_price NOT WORKING, IT PLACES FIRST TIME ONLY / THEN GOES RE-ADD LOOP
+            // default_price NOT WORKING, IT PLACES FIRST TIME ONLY / THEN GOES RE-ADD LOOP
     }
     static async Task<string?> Request(HttpClient client, string api)
     {
