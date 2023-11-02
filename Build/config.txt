@@ -1,0 +1,9 @@
+key=
+api=https://tf2.tm/api/v2
+threshold=4
+step=1
+keep_price=0
+single_target=1
+cooldown_delay=60000
+default_delay=15000
+short_delay=5000

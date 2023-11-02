@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,6 +8,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="py.xaml" />
+    <None Remove="pyDetail.xaml" />
+    <None Remove="pyFlyout.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ConsoleTables" Version="2.5.0" />
+    <PackageReference Include="Jint" Version="3.0.0-beta-2053" />
+    <PackageReference Include="Jint.CommonJS" Version="1.0.14" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
